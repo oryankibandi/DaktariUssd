@@ -21,7 +21,7 @@ const purseId = process.env.PURSE_ID;
 const clientPayment = async (customer, amount) => {
   log.info(`Processing loan for ${customer.customerNumber.number}`);
 
-  const { name } = await customer.getMetadata();
+  const { name, day } = await customer.getMetadata();
 
   const res = await client.initiatePayment(
     {
@@ -56,12 +56,12 @@ const clientPayment = async (customer, amount) => {
   });
   await customer.sendMessage(smsChannel, {
     body: {
-      text: `Congratulations ${name}!\nYour fee of KES ${amount} has been received succesfully!\nSee you on monday`,
+      text: `Congratulations ${name}!\nYour fee of KES ${amount} has been received succesfully!`,
     },
   });
 };
 
-async function sendResults(num) {
+async function sendResults(num, day) {
   let telegramChannel = {
     channel: 'telegram',
     number: 'kibandi',
@@ -73,7 +73,7 @@ async function sendResults(num) {
   await patient
     .sendMessage(smsChannel, {
       body: {
-        text: 'Thank you for your enquiry, we will get back to you on the with your results',
+        text: `Your appointment has been scheduled. Thank You for your time. See You on ${day}! :-)`,
       },
     })
     .catch((error) => {
@@ -95,7 +95,7 @@ const processUssd = async (notification, customer, appData, callback) => {
     }
 
     const customerData = await customer.getMetadata();
-    let { name } = customerData;
+    let { name, day } = customerData;
     const menu = {
       text: null,
       isTerminal: false,
@@ -130,12 +130,21 @@ const processUssd = async (notification, customer, appData, callback) => {
         });
         break;
       case 'confirm-day':
-        let appointment = input;
-        menu.text = `Thank you,\n we will get back to you on the availability of ${appointment}. You will be charged 1000 bob for consultation!`;
+        let value = input;
+
+        week = {
+          1: 'Monday',
+          2: 'Tuesday',
+          3: 'Wednesday',
+          4: 'Thursday',
+          5: 'Friday',
+        };
+        day = week[value];
+        menu.text = `Thank you,\n we will get back to you on the availability of ${day}. You will be charged 1000 bob for consultation!`;
         menu.isTerminal = true;
         nextscreen = 'home';
         callback(menu, { screen: nextscreen });
-        await sendResults(patientNumber);
+        await sendResults(patientNumber, day);
         await clientPayment(customer, 1000);
         break;
       case 'quit':
@@ -157,6 +166,7 @@ const processUssd = async (notification, customer, appData, callback) => {
     }
     await customer.updateMetadata({
       name,
+      day,
     });
   } catch (error) {
     log.error('USSD Error: ', error);
