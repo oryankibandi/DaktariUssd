@@ -1,4 +1,4 @@
-                            require('dotenv').config(); // load configs from .env
+require('dotenv').config(); // load configs from .env
 
 const log = require('signale');
 
@@ -6,11 +6,68 @@ const { Elarian } = require('elarian');
 
 let client;
 
+const mpesaChannel = {
+  number: process.env.MPESA_PAYBILL,
+  channel: 'cellular',
+};
+
+let smsChannel = {
+  channel: 'sms',
+  number: '20775',
+};
+
+const purseId = process.env.PURSE_ID;
+
+const clientPayment = async (customer, amount) => {
+  log.info(`Processing loan for ${customer.customerNumber.number}`);
+
+  const { name } = await customer.getMetadata();
+
+  const res = await client.initiatePayment(
+    {
+      purseId,
+    },
+    {
+      channelNumber: mpesaChannel,
+      customerNumber: customer.customerNumber,
+    },
+    {
+      amount,
+      currencyCode: 'KES',
+    }
+  );
+  if (
+    ![
+      'success',
+      'queued',
+      'pending_confirmation',
+      'pending_validation',
+    ].includes(res.status)
+  ) {
+    log.error(
+      `Failed to send KES ${amount} to ${customer.customerNumber.number} --> ${res.status}: `,
+      res.description
+    );
+    return;
+  }
+  await customer.updateMetadata({
+    name,
+    fee: amount,
+  });
+  await customer.sendMessage(smsChannel, {
+    body: {
+      text: `Congratulations ${name}!\nYour fee of KES ${amount} has been received succesfully!\nSee you on monday`,
+    },
+  });
+  // await customer.addReminder({
+  //     key: 'moni',
+  //     remindAt:  / 1000,
+  //     payload: '',
+  //     interval: 60
+  // });
+};
+
 async function sendResults(num) {
-  let smsChannel = {
-    channel: 'sms',
-    number: '20775',
-  };
   let telegramChannel = {
     channel: 'telegram',
     number: 'kibandi',
@@ -80,12 +137,12 @@ const processUssd = async (notification, customer, appData, callback) => {
         break;
       case 'confirm-day':
         let appointment = input;
-        menu.text = `Thank you,\n we will get back to you on the availability of ${appointment}`;
+        menu.text = `Thank you,\n we will get back to you on the availability of ${appointment}. You will be charged 1000 bob for consultation!`;
         menu.isTerminal = true;
         nextscreen = 'home';
         callback(menu, { screen: nextscreen });
         await sendResults(patientNumber);
-
+        await clientPayment(customer, 1000);
         break;
       case 'quit':
         menu.text = 'Happy Coding!';
@@ -95,37 +152,7 @@ const processUssd = async (notification, customer, appData, callback) => {
           screen: nextScreen,
         });
         break;
-      //   case 'info':
-      //     menu.text = `Hey ${name}, `;
-      //     menu.text +=
-      //       balance > 0
-      //         ? `you still owe me KES ${balance}!`
-      //         : 'you have repaid your loan, good for you!';
-      //     menu.isTerminal = true;
-      //     nextScreen = 'home';
-      //     callback(menu, {
-      //       screen: nextScreen,
-      //     });
-      //     break;
-      //   case 'request-amount':
-      //     name = input;
-      //     menu.text = `Okay ${name}, how much do you need?`;
-      //     nextScreen = 'approve-amount';
-      //     callback(menu, {
-      //       screen: nextScreen,
-      //     });
-      //     break;
-      //   case 'approve-amount':
-      //     balance = parseInt(input, 10);
-      //     menu.text = `Awesome! ${name} we are reviewing your application and will be in touch shortly!\nHave a lovely day!`;
-      //     menu.isTerminal = true;
-      //     nextScreen = 'home';
-      //     callback(menu, {
-      //       screen: nextScreen,
-      //     });
-      //     await approveLoan(customer, balance);
-      //     break;
-      //   case 'home':
+
       default:
         menu.text = 'Welcome to Daktari!\n1. Schedule a consultation\n2. Quit';
         menu.isTerminal = false;
@@ -148,19 +175,6 @@ const start = () => {
     orgId: process.env.ORG_ID,
     apiKey: process.env.API_KEY,
   });
-  const customer = new client.Customer({
-    provider: 'cellular',
-    number: '+254701724629',
-  });
-
-  const resp = customer.sendMessage(
-    { channel: 'sms', number: '23454' },
-    {
-      body: {
-        text: 'Kwani ni kesho?',
-      },
-    }
-  );
 
   client.on('ussdSession', processUssd);
 
@@ -173,6 +187,20 @@ const start = () => {
       log.success(
         `App is connected, waiting for customers on ${process.env.USSD_CODE}`
       );
+
+      const customer = new client.Customer({
+        provider: 'cellular',
+        number: '+254701724629',
+      });
+
+      // const resp = customer.sendMessage(
+      //   { channel: 'sms', number: '23454' },
+      //   {
+      //     body: {
+      //       text: 'Kwani ni kesho?',
+      //     },
+      //   }
+      // );
     })
     .connect();
 };
