@@ -59,12 +59,6 @@ const clientPayment = async (customer, amount) => {
       text: `Congratulations ${name}!\nYour fee of KES ${amount} has been received succesfully!\nSee you on monday`,
     },
   });
-  // await customer.addReminder({
-  //     key: 'moni',
-  //     remindAt:  / 1000,
-  //     payload: '',
-  //     interval: 60
-  // });
 };
 
 async function sendResults(num) {
@@ -192,15 +186,6 @@ const start = () => {
         provider: 'cellular',
         number: '+254701724629',
       });
-
-      // const resp = customer.sendMessage(
-      //   { channel: 'sms', number: '23454' },
-      //   {
-      //     body: {
-      //       text: 'Kwani ni kesho?',
-      //     },
-      //   }
-      // );
     })
     .connect();
 };
