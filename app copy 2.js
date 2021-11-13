@@ -1,4 +1,4 @@
-                            require('dotenv').config(); // load configs from .env
+require('dotenv').config(); // load configs from .env
 
 const log = require('signale');
 
@@ -6,34 +6,7 @@ const { Elarian } = require('elarian');
 
 let client;
 
-async function sendResults(num) {
-  let smsChannel = {
-    channel: 'sms',
-    number: '20775',
-  };
-  let telegramChannel = {
-    channel: 'telegram',
-    number: 'kibandi',
-  };
-  const patient = new client.Customer({
-    number: num,
-    provider: 'cellular',
-  });
-  await patient
-    .sendMessage(smsChannel, {
-      body: {
-        text: 'Thank you for your enquiry, we will get back to you on the with your results',
-      },
-    })
-    .catch((error) => {
-      console.log(error.message);
-      console.log('message not sent......');
-    });
-}
-
 const processUssd = async (notification, customer, appData, callback) => {
-  let patientNumber = notification.customerNumber.number;
-  console.log(notification.customerNumber.number);
   try {
     log.info(`Processing USSD from ${customer.customerNumber.number}`);
     const input = notification.input.text;
@@ -84,8 +57,6 @@ const processUssd = async (notification, customer, appData, callback) => {
         menu.isTerminal = true;
         nextscreen = 'home';
         callback(menu, { screen: nextscreen });
-        await sendResults(patientNumber);
-
         break;
       case 'quit':
         menu.text = 'Happy Coding!';
@@ -148,19 +119,6 @@ const start = () => {
     orgId: process.env.ORG_ID,
     apiKey: process.env.API_KEY,
   });
-  const customer = new client.Customer({
-    provider: 'cellular',
-    number: '+254701724629',
-  });
-
-  const resp = customer.sendMessage(
-    { channel: 'sms', number: '23454' },
-    {
-      body: {
-        text: 'Kwani ni kesho?',
-      },
-    }
-  );
 
   client.on('ussdSession', processUssd);
 
