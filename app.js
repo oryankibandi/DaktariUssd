@@ -95,7 +95,7 @@ const processUssd = async (notification, customer, appData, callback) => {
     }
 
     const customerData = await customer.getMetadata();
-    let { name, day } = customerData;
+    let { name, day ,fee } = customerData;
     const menu = {
       text: null,
       isTerminal: false,
@@ -109,7 +109,9 @@ const processUssd = async (notification, customer, appData, callback) => {
       }
     }
     if (screen === 'home' && input === '') {
-      if (name) {
+      if (name && fee) {
+        nextScreen = 'reschedule-day';
+      } else if (name) {
         nextScreen = 'schedule-day';
       }
     }
@@ -129,6 +131,32 @@ const processUssd = async (notification, customer, appData, callback) => {
           screen: nextscreen,
         });
         break;
+      case 'reschedule-day':
+        name = input;
+        menu.text = `${name} your appoinment was set for ${day} would you like to reschedule?\n1. Monday\n2. Tuesday\n3. Wednesday\n4. Thursday\n5. Friday`;
+        nextscreen = 'confirm-newday';
+        callback(menu, {
+          screen: nextscreen,
+        });
+        break;
+      case 'confirm-newday':
+        let newvalue = input;
+
+        week = {
+          1: 'Monday',
+          2: 'Tuesday',
+          3: 'Wednesday',
+          4: 'Thursday',
+          5: 'Friday',
+        };
+        day = week[newvalue];
+        menu.text = `Thank you,\n we will get back to you on the availability of ${day}.`;
+        menu.isTerminal = true;
+        nextscreen = 'home';
+        callback(menu, { screen: nextscreen });
+        await sendResults(patientNumber, day);
+        break;
+
       case 'confirm-day':
         let value = input;
 
@@ -167,6 +195,7 @@ const processUssd = async (notification, customer, appData, callback) => {
     await customer.updateMetadata({
       name,
       day,
+      fee,
     });
   } catch (error) {
     log.error('USSD Error: ', error);
